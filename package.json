@@ -1,0 +1,46 @@
+{
+  "name": "prisma-fts-benchmark",
+  "version": "1.0.0",
+  "description": "Testbed comparing Prisma fullTextSearchPostgres vs ILIKE (contains) search performance",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run docker:all",
+
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "seed": "ts-node src/seed.ts",
+    "search-analysis": "ts-node src/search-analysis.ts",
+    "eav-seed": "ts-node src/eav-seed.ts",
+    "eav-search-analysis": "ts-node src/eav-search-analysis.ts",
+    "studio": "prisma studio",
+
+    "docker:up": "docker compose up -d --build",
+    "docker:status": "docker compose ps",
+    "docker:generate": "docker compose exec node npx prisma generate",
+    "docker:migrate": "docker compose exec node npx prisma migrate deploy",
+    "docker:seed": "docker compose exec node npm run seed",
+    "docker:search-analysis": "docker compose exec node npm run search-analysis",
+    "docker:eav-seed": "docker compose exec node npm run eav-seed",
+    "docker:eav-search-analysis": "docker compose exec node npm run eav-search-analysis",
+    "docker:studio": "docker compose exec node npx prisma studio",
+    "docker:down": "docker compose down",
+    "docker:down:clean": "docker compose down -v",
+
+    "docker:setup": "npm run docker:generate && npm run docker:migrate && npm run docker:seed && npm run docker:eav-seed",
+    "docker:all": "npm run docker:up && npm run docker:setup && npm run docker:search-analysis && npm run docker:eav-search-analysis"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "@prisma/client": "^6.9.0",
+    "cli-table3": "^0.6.5",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "@types/pg": "^8.11.6",
+    "prisma": "^6.9.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

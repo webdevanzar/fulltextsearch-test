@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: fts_benchmark_pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: benchmark
+      POSTGRES_PASSWORD: benchmark
+      POSTGRES_DB: fts_benchmark
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmark -d fts_benchmark"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Tuned a bit so EXPLAIN ANALYZE buffer numbers are meaningful on a single container.
+    # default_text_search_config is pinned to English so Prisma's implicit
+    # to_tsvector(column) calls (no config argument) resolve deterministically
+    # and match the GIN indexes created in migration.sql byte-for-byte.
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=32MB
+      -c maintenance_work_mem=256MB
+      -c effective_cache_size=512MB
+      -c track_io_timing=on
+      -c default_text_search_config=pg_catalog.english
+
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fts_benchmark_node
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://benchmark:benchmark@postgres:5432/fts_benchmark?schema=public"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    working_dir: /app
+    command: tail -f /dev/null # keep container alive; exec in for seed/benchmark
+
+volumes:
+  pg_data:

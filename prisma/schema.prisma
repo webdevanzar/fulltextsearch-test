@@ -1,0 +1,176 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  subCategories SubCategory[]
+  listings      Listing[]
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id         String @id @default(uuid())
+  name       String
+  categoryId String
+
+  category Category  @relation(fields: [categoryId], references: [id])
+  listings Listing[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@map("sub_categories")
+}
+
+model Listing {
+  id            String  @id @default(uuid())
+  title         String
+  description   String  @db.Text
+  price         Decimal @db.Decimal(10, 2)
+  categoryId    String
+  subCategoryId String
+
+  // Dynamic, category-shaped attributes (brand/year/mileage for Motors,
+  // bedrooms/sqft for Real Estate, ram/storage for Gadgets, ...).
+  // See prisma/migrations/0_init/migration.sql "Indexing strategy" for why
+  // a plain GIN(jsonb_ops) index here does NOT accelerate every query shape
+  // Prisma can generate against it.
+  customData Json
+
+  createdAt DateTime @default(now())
+
+  category    Category    @relation(fields: [categoryId], references: [id])
+  subCategory SubCategory @relation(fields: [subCategoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([customData], type: Gin)
+  @@map("listings")
+}
+
+// ============================================================================
+// EAV (Entity-Attribute-Value) structure — a FULLY INDEPENDENT parallel to
+// Category/SubCategory/Listing above. No shared tables or foreign keys with
+// the JSONB structure. Stores the same kind of dynamic attribute data
+// (brand/year/mileage/bedrooms/...) as rows instead of a JSONB blob, seeded
+// with its own 100,000 listings, so the two storage strategies can be
+// benchmarked head-to-head on equivalent (not shared) data.
+// See prisma/migrations/1_eav_custom_fields/migration.sql and
+// src/eav-benchmark.ts.
+// ============================================================================
+
+model EavCategory {
+  id   String @id @default(uuid())
+  name String @unique
+
+  subCategories EavSubCategory[]
+  listings      EavListing[]
+
+  @@map("eav_categories")
+}
+
+model EavSubCategory {
+  id         String @id @default(uuid())
+  name       String
+  categoryId String
+
+  category EavCategory @relation(fields: [categoryId], references: [id])
+  fields   SubCategoryField[]
+  listings EavListing[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@map("eav_sub_categories")
+}
+
+model EavListing {
+  id            String  @id @default(uuid())
+  title         String
+  description   String  @db.Text
+  price         Decimal @db.Decimal(10, 2)
+  categoryId    String
+  subCategoryId String
+
+  createdAt DateTime @default(now())
+
+  category    EavCategory        @relation(fields: [categoryId], references: [id])
+  subCategory EavSubCategory     @relation(fields: [subCategoryId], references: [id])
+  fieldValues ListingFieldValue[]
+
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@map("eav_listings")
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  SELECT
+}
+
+model CustomField {
+  id      String    @id @default(uuid())
+  name    String    @unique // system key, e.g. "motors_brand", "realestate_bedrooms"
+  label   String // UI label, e.g. "Brand", "No. of Bedrooms"
+  type    FieldType
+  options Json? // for SELECT fields: ["Toyota", "Honda", ...]
+
+  subCategories SubCategoryField[]
+  fieldValues   ListingFieldValue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("custom_fields")
+}
+
+// Which custom fields apply to which EAV subcategory (drives dynamic form/filter UI).
+model SubCategoryField {
+  id            String @id @default(uuid())
+  subCategoryId String
+  customFieldId String
+
+  subCategory EavSubCategory @relation(fields: [subCategoryId], references: [id])
+  customField CustomField    @relation(fields: [customFieldId], references: [id])
+
+  @@unique([subCategoryId, customFieldId])
+  @@index([subCategoryId])
+  @@map("sub_category_fields")
+}
+
+// The EAV value row itself: one per (listing, custom field) pair.
+//
+// Typed value columns (valueText / valueNumber / valueBoolean) rather than a
+// single TEXT column — a naive single-text-column EAV can't do indexed
+// numeric range queries at all (everything requires a cast at query time).
+// This "wide EAV" shape is what makes the year>=2020-style range benchmark
+// scenario fair against the JSONB comparison.
+model ListingFieldValue {
+  id            String @id @default(uuid())
+  listingId     String
+  customFieldId String
+
+  valueText    String?
+  valueNumber  Decimal? @db.Decimal(20, 6)
+  valueBoolean Boolean?
+
+  listing     EavListing  @relation(fields: [listingId], references: [id])
+  customField CustomField @relation(fields: [customFieldId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([listingId, customFieldId])
+  @@index([customFieldId, valueText])
+  @@index([customFieldId, valueNumber])
+  @@map("listing_field_values")
+}
