@@ -74,7 +74,7 @@ CREATE INDEX "listings_subCategoryId_idx" ON "listings"("subCategoryId");
 -- extraction or a numeric-cast range comparison at all. In other words:
 -- the index this migration was asked to build, and the index Prisma's own
 -- JSON filter API can actually use, are not the same thing. The benchmark
--- (src/benchmark.ts) and README both call this out explicitly — it is the
+-- (src/search-analysis.ts) and README both call this out explicitly — it is the
 -- single most important "computational complexity" finding this testbed
 -- surfaces, not a bug to silently work around here.
 -- ============================================================================
@@ -98,7 +98,7 @@ CREATE INDEX "listings_customData_idx" ON "listings" USING GIN ("customData");
 -- `search` filter on Postgres can NEVER be backed by an index — this is a
 -- structural limitation, not a missing-index bug, and it's arguably the
 -- single most important "computational complexity" finding this testbed
--- surfaces. src/benchmark.ts and README.md both call this out explicitly.
+-- surfaces. src/search-analysis.ts and README.md both call this out explicitly.
 --
 -- The only way to get an indexable tsvector expression is to pin the
 -- config to a literal (e.g. 'english'), which is immutable because it's
@@ -108,7 +108,7 @@ CREATE INDEX "listings_customData_idx" ON "listings" USING GIN ("customData");
 
 -- Combined generated column + GIN index — the "properly designed" single
 -- production index for multi-column search, used by the raw EXPLAIN ANALYZE
--- demonstration in src/benchmark.ts to show a clean BitmapAnd/BitmapOr plan.
+-- demonstration in src/search-analysis.ts to show a clean BitmapAnd/BitmapOr plan.
 -- Note this is NOT reachable via Prisma's `search` filter (see above) —
 -- only via raw SQL using to_tsvector('english', ...) / the search_vector
 -- column directly.

@@ -65,7 +65,7 @@ model Listing {
 // with its own 100,000 listings, so the two storage strategies can be
 // benchmarked head-to-head on equivalent (not shared) data.
 // See prisma/migrations/1_eav_custom_fields/migration.sql and
-// src/eav-benchmark.ts.
+// src/eav-search-analysis.ts.
 // ============================================================================
 
 model EavCategory {

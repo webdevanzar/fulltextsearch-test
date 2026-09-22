@@ -6,7 +6,7 @@
 -- table here is prefixed/named distinctly (eav_categories, eav_listings,
 -- custom_fields, sub_category_fields, listing_field_values) so the two
 -- storage strategies can be seeded and benchmarked head-to-head without any
--- shared state. See src/eav-benchmark.ts and README.md.
+-- shared state. See src/eav-search-analysis.ts and README.md.
 -- ============================================================================
 
 -- CreateTable
